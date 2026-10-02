@@ -1,0 +1,10 @@
+-- ============================================================
+-- RiskLens Compliance Copilot — Database & Schema Setup
+-- ============================================================
+
+CREATE DATABASE IF NOT EXISTS RISKLENS;
+CREATE SCHEMA IF NOT EXISTS RISKLENS.CORE;
+CREATE SCHEMA IF NOT EXISTS RISKLENS.SIGNALS;
+CREATE SCHEMA IF NOT EXISTS RISKLENS.REGULATORY;
+CREATE SCHEMA IF NOT EXISTS RISKLENS.AUDIT;
+CREATE SCHEMA IF NOT EXISTS RISKLENS.GOVERNANCE;

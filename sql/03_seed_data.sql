@@ -1,0 +1,119 @@
+-- ============================================================
+-- RiskLens — Synthetic Data with Seeded Fraud Patterns
+-- Run after 02_create_tables.sql
+-- ============================================================
+
+-- 5000 Customers
+INSERT INTO RISKLENS.CORE.CUSTOMERS
+SELECT 'CUST-' || LPAD(SEQ4()::VARCHAR, 6, '0'),
+    CASE MOD(SEQ4(),20) WHEN 0 THEN 'James' WHEN 1 THEN 'Maria' WHEN 2 THEN 'Robert' WHEN 3 THEN 'Priya'
+        WHEN 4 THEN 'Ahmed' WHEN 5 THEN 'Chen' WHEN 6 THEN 'Sarah' WHEN 7 THEN 'Raj'
+        WHEN 8 THEN 'Elena' WHEN 9 THEN 'David' WHEN 10 THEN 'Fatima' WHEN 11 THEN 'Wei'
+        WHEN 12 THEN 'Anna' WHEN 13 THEN 'Omar' WHEN 14 THEN 'Yuki' WHEN 15 THEN 'Luis'
+        WHEN 16 THEN 'Nadia' WHEN 17 THEN 'Kofi' WHEN 18 THEN 'Ingrid' ELSE 'Sanjay' END,
+    CASE MOD(SEQ4(),20) WHEN 0 THEN 'Smith' WHEN 1 THEN 'Gonzalez' WHEN 2 THEN 'Patel' WHEN 3 THEN 'Sharma'
+        WHEN 4 THEN 'Al-Rashid' WHEN 5 THEN 'Liu' WHEN 6 THEN 'Johnson' WHEN 7 THEN 'Kumar'
+        WHEN 8 THEN 'Petrov' WHEN 9 THEN 'Williams' WHEN 10 THEN 'Hassan' WHEN 11 THEN 'Zhang'
+        WHEN 12 THEN 'Mueller' WHEN 13 THEN 'Khan' WHEN 14 THEN 'Tanaka' WHEN 15 THEN 'Herrera'
+        WHEN 16 THEN 'Abadi' WHEN 17 THEN 'Mensah' WHEN 18 THEN 'Lindqvist' ELSE 'Reddy' END,
+    DATEADD(DAY, -UNIFORM(7000,25000,RANDOM()), CURRENT_DATE()),
+    CASE MOD(SEQ4(),10) WHEN 0 THEN 'US' WHEN 1 THEN 'IN' WHEN 2 THEN 'UK' WHEN 3 THEN 'UAE'
+        WHEN 4 THEN 'CN' WHEN 5 THEN 'DE' WHEN 6 THEN 'NG' WHEN 7 THEN 'JP' WHEN 8 THEN 'BR' ELSE 'SG' END,
+    CASE MOD(SEQ4(),8) WHEN 0 THEN 'US' WHEN 1 THEN 'IN' WHEN 2 THEN 'UK' WHEN 3 THEN 'UAE'
+        WHEN 4 THEN 'SG' WHEN 5 THEN 'HK' WHEN 6 THEN 'DE' ELSE 'JP' END,
+    CASE WHEN MOD(SEQ4(),10) < 8 THEN 'INDIVIDUAL' ELSE 'CORPORATE' END,
+    CASE WHEN MOD(SEQ4(),100) < 70 THEN 'LOW' WHEN MOD(SEQ4(),100) < 85 THEN 'MEDIUM'
+         WHEN MOD(SEQ4(),100) < 95 THEN 'HIGH' ELSE 'VERY_HIGH' END,
+    CASE WHEN MOD(SEQ4(),50) = 0 THEN TRUE ELSE FALSE END,
+    CASE WHEN MOD(SEQ4(),200) = 0 THEN TRUE ELSE FALSE END,
+    DATEADD(DAY, -UNIFORM(30,3650,RANDOM()), CURRENT_DATE()),
+    DATEADD(DAY, -UNIFORM(0,365,RANDOM()), CURRENT_DATE()),
+    CASE MOD(SEQ4(),8) WHEN 0 THEN 'Engineer' WHEN 1 THEN 'Business Owner' WHEN 2 THEN 'Teacher'
+        WHEN 3 THEN 'Doctor' WHEN 4 THEN 'Trader' WHEN 5 THEN 'Retired' WHEN 6 THEN 'Student' ELSE 'Consultant' END,
+    ROUND(UNIFORM(10000,500000,RANDOM()), 2),
+    CASE MOD(SEQ4(),5) WHEN 0 THEN 'SALARY' WHEN 1 THEN 'BUSINESS_INCOME' WHEN 2 THEN 'INVESTMENTS'
+        WHEN 3 THEN 'INHERITANCE' ELSE 'RENTAL_INCOME' END,
+    '+1-555-' || LPAD(UNIFORM(1000000,9999999,RANDOM())::VARCHAR, 7, '0'),
+    LOWER(CASE MOD(SEQ4(),20) WHEN 0 THEN 'james' ELSE 'user' END) || SEQ4()::VARCHAR || '@email.com',
+    SEQ4()::VARCHAR || ' Main Street, City',
+    CURRENT_TIMESTAMP()
+FROM TABLE(GENERATOR(ROWCOUNT => 5000));
+
+-- 8000 Accounts (see full generator in CoCo session)
+-- 100000 Normal Transactions + 5 fraud patterns
+-- 2000 Loans with credit deterioration
+-- 360 Positions for LCR
+-- 10 Watchlist entries, 10 Risk Rules, 20 Regulatory chunks, 10 Eval questions
+-- See full seed scripts in CoCo conversation history
+
+-- ═══════════════════════════════════════
+-- SEEDED FRAUD PATTERNS
+-- ═══════════════════════════════════════
+
+-- Pattern 1: STRUCTURING — ACC-00000050 (25 cash deposits $8.5K-$9.9K)
+INSERT INTO RISKLENS.CORE.TRANSACTIONS
+SELECT 'TXN-STRUCT-' || LPAD(SEQ4()::VARCHAR,5,'0'), DATEADD(HOUR,-SEQ4()*3,CURRENT_TIMESTAMP()),
+    'ACC-00000050','CUST-000050','CREDIT','CASH_DEPOSIT',
+    ROUND(UNIFORM(8500,9900,RANDOM()),2),'USD',NULL,'Cash Deposit',NULL,'US','BRANCH','Cash deposit',
+    FALSE,'US','US',CURRENT_TIMESTAMP()
+FROM TABLE(GENERATOR(ROWCOUNT => 25));
+
+-- Pattern 2: LAYERING — ACC-00000100 (rapid in-out via Offshore Holdings Ltd)
+INSERT INTO RISKLENS.CORE.TRANSACTIONS
+SELECT 'TXN-LAYER-IN-' || LPAD(SEQ4()::VARCHAR,4,'0'), DATEADD(MINUTE,-SEQ4()*45,CURRENT_TIMESTAMP()),
+    'ACC-00000100','CUST-000100','CREDIT','WIRE_TRANSFER',
+    ROUND(UNIFORM(20000,80000,RANDOM()),2),'USD','ACC-EXT-' || LPAD(SEQ4()::VARCHAR,4,'0'),
+    'Offshore Holdings Ltd','Deutsche Bank','CH','SWIFT','Invoice payment',TRUE,'CH','US',CURRENT_TIMESTAMP()
+FROM TABLE(GENERATOR(ROWCOUNT => 15));
+
+INSERT INTO RISKLENS.CORE.TRANSACTIONS
+SELECT 'TXN-LAYER-OUT-' || LPAD(SEQ4()::VARCHAR,4,'0'), DATEADD(MINUTE,-(SEQ4()*45+30),CURRENT_TIMESTAMP()),
+    'ACC-00000100','CUST-000100','DEBIT','WIRE_TRANSFER',
+    ROUND(UNIFORM(18000,75000,RANDOM()),2),'USD','ACC-EXT-' || LPAD(UNIFORM(100,999,RANDOM())::VARCHAR,4,'0'),
+    'Various Trading Co','HSBC','HK','SWIFT','Trade settlement',TRUE,'US','HK',CURRENT_TIMESTAMP()
+FROM TABLE(GENERATOR(ROWCOUNT => 15));
+
+-- Pattern 3: DORMANT REACTIVATION — ACC-00000200
+UPDATE RISKLENS.CORE.ACCOUNTS SET ACCOUNT_STATUS='DORMANT', LAST_TRANSACTION_DATE=DATEADD(MONTH,-14,CURRENT_DATE())
+WHERE ACCOUNT_ID = 'ACC-00000200';
+
+INSERT INTO RISKLENS.CORE.TRANSACTIONS
+SELECT 'TXN-DORM-' || LPAD(SEQ4()::VARCHAR,4,'0'), DATEADD(HOUR,-SEQ4()*2,CURRENT_TIMESTAMP()),
+    'ACC-00000200','CUST-000200','CREDIT','WIRE_TRANSFER',
+    ROUND(UNIFORM(50000,200000,RANDOM()),2),'USD','ACC-EXT-DORM-' || SEQ4()::VARCHAR,
+    'Sunrise Global LLC','Standard Chartered','AE','SWIFT','Business payment',TRUE,'AE','US',CURRENT_TIMESTAMP()
+FROM TABLE(GENERATOR(ROWCOUNT => 12));
+
+-- Pattern 4: FAN-OUT — ACC-00000300 (35 transfers to unique recipients)
+INSERT INTO RISKLENS.CORE.TRANSACTIONS
+SELECT 'TXN-FAN-' || LPAD(SEQ4()::VARCHAR,4,'0'), DATEADD(MINUTE,-SEQ4()*20,CURRENT_TIMESTAMP()),
+    'ACC-00000300','CUST-000300','DEBIT','WIRE_TRANSFER',
+    ROUND(UNIFORM(5000,25000,RANDOM()),2),'USD','ACC-FANOUT-' || LPAD(SEQ4()::VARCHAR,4,'0'),
+    'Recipient ' || SEQ4()::VARCHAR,'Various Banks',
+    CASE MOD(SEQ4(),5) WHEN 0 THEN 'NG' WHEN 1 THEN 'KE' WHEN 2 THEN 'GH' WHEN 3 THEN 'PH' ELSE 'MM' END,
+    'ONLINE','Payment',TRUE,'US',
+    CASE MOD(SEQ4(),5) WHEN 0 THEN 'NG' WHEN 1 THEN 'KE' WHEN 2 THEN 'GH' WHEN 3 THEN 'PH' ELSE 'MM' END,
+    CURRENT_TIMESTAMP()
+FROM TABLE(GENERATOR(ROWCOUNT => 35));
+
+-- Pattern 5: HIGH-RISK WIRES — ACC-00000400 (to OFAC entity)
+INSERT INTO RISKLENS.CORE.TRANSACTIONS
+SELECT 'TXN-HIRISK-' || LPAD(SEQ4()::VARCHAR,4,'0'), DATEADD(HOUR,-SEQ4()*8,CURRENT_TIMESTAMP()),
+    'ACC-00000400','CUST-000400','DEBIT','WIRE_TRANSFER',
+    ROUND(UNIFORM(200000,900000,RANDOM()),2),'USD','ACC-EXT-HR-' || SEQ4()::VARCHAR,
+    'Global Commodities FZE','Emirates NBD','AE','SWIFT','Commodity purchase',TRUE,'US','AE',CURRENT_TIMESTAMP()
+FROM TABLE(GENERATOR(ROWCOUNT => 8));
+
+-- Watchlist
+INSERT INTO RISKLENS.CORE.WATCHLIST VALUES
+('WL-001','Offshore Holdings Ltd','ORGANIZATION','ADVERSE_MEDIA','CH','Offshore Holdings, OH Ltd','2023-06-15','Shell company linked to money laundering investigation',TRUE),
+('WL-002','Global Commodities FZE','ORGANIZATION','OFAC','AE','Global Comm FZE, GC Trading','2024-01-10','Sanctioned entity - trade-based laundering',TRUE),
+('WL-003','Sunrise Global LLC','ORGANIZATION','UN','AE','Sunrise LLC, SG Holdings','2023-09-22','UN-listed entity - terrorism financing',TRUE);
+
+-- Risk Rules (sample)
+INSERT INTO RISKLENS.CORE.RISK_RULES (RULE_ID,RULE_NAME,DOMAIN,DESCRIPTION,SEVERITY,THRESHOLD_VALUE,THRESHOLD_UNIT,LOOKBACK_HOURS,IS_ACTIVE,REGULATORY_REFERENCE) VALUES
+('RR-001','Structuring Detection','AML','Multiple cash deposits just below $10,000 CTR threshold','HIGH',10000,'USD',72,TRUE,'BSA/AML - 31 CFR 1010.311'),
+('RR-002','Rapid Layering','AML','Funds received and transferred out within hours','HIGH',0.8,'RATIO_IN_OUT',24,TRUE,'FATF Recommendation 20'),
+('RR-005','Watchlist Match','AML','Counterparty matches sanctioned entity','CRITICAL',0,'MATCH',0,TRUE,'OFAC Compliance Requirements'),
+('RR-007','LCR Threshold Breach','LIQUIDITY','LCR falls below 100%','CRITICAL',100,'PERCENT',24,TRUE,'Basel III LCR Framework'),
+('RR-008','NPA Threshold Breach','CREDIT','NPA ratio exceeds 5%','HIGH',5,'PERCENT',720,TRUE,'RBI Master Circular on IRAC Norms');
